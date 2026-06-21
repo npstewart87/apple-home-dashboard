@@ -81,7 +81,7 @@ export class HomeSettingsManager {
       excludedFromDashboard: customizations.home?.excluded_from_dashboard || [],
       excludedFromHome: customizations.home?.excluded_from_home || [],
       includedSwitches: customizations.home?.included_switches || [],
-      extraAccessories: customizations.home?.extra_accessories || [],
+      extraAccessories: customizations.home?.promoted_entities || customizations.home?.extra_accessories || [],
       weatherEntity: customizations.home?.weather_entity || undefined,
       backgroundType: currentBackground.type,
       customBackground: currentBackground.type === 'custom' ? currentBackground.backgroundImage : undefined,
@@ -1354,7 +1354,15 @@ export class HomeSettingsManager {
     home.excluded_from_dashboard = this.settings.excludedFromDashboard;
     home.excluded_from_home = this.settings.excludedFromHome;
     home.included_switches = this.settings.includedSwitches;
-    home.extra_accessories = this.settings.extraAccessories;
+    const oldPromoted = new Set<string>(home.promoted_entities || home.extra_accessories || []);
+    const newlyPromotedSensorCards = this.settings.extraAccessories.filter(entityId => {
+      const domain = entityId.split('.')[0];
+      return !oldPromoted.has(entityId) && (domain === 'sensor' || domain === 'binary_sensor');
+    });
+
+    home.promoted_entities = this.settings.extraAccessories;
+    delete home.extra_accessories;
+    home.sensor_cards = Array.from(new Set([...(home.sensor_cards || []), ...newlyPromotedSensorCards]));
     home.weather_entity = this.settings.weatherEntity;
     home.show_switches = this.settings.showSwitches;
     home.show_energy = this.settings.showEnergy;

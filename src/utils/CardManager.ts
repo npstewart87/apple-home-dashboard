@@ -34,6 +34,29 @@ export class CardManager {
     }
   }
 
+  shouldCardBeSensor(entityId: string, _areaId: string = 'home', _context: string = 'home'): boolean {
+    const homeData = this.customizationManager.getCustomization('home');
+    const sensorCards: string[] = homeData.sensor_cards || [];
+    return sensorCards.includes(entityId);
+  }
+
+  async toggleSensorCard(entityId: string): Promise<boolean> {
+    const homeData = this.customizationManager.getCustomization('home');
+    const sensorCards: string[] = [...(homeData.sensor_cards || [])];
+    const index = sensorCards.indexOf(entityId);
+    const newState = index === -1;
+
+    if (newState) {
+      sensorCards.push(entityId);
+    } else {
+      sensorCards.splice(index, 1);
+    }
+
+    homeData.sensor_cards = sensorCards;
+    await this.customizationManager.setCustomization('home', homeData);
+    return newState;
+  }
+
   // Async version - ensures customizations are loaded first
   async shouldCardBeTallAsync(entityId: string, areaId: string, context: string = 'home'): Promise<boolean> {
     await this.customizationManager.ensureCustomizationsLoaded();
