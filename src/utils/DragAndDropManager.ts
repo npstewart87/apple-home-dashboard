@@ -455,6 +455,7 @@ export class DragAndDropManager {
     }
 
     const areaId = gridContainer.dataset.areaId;
+    const isHomeAreaGrid = gridContainer.classList.contains('area-entities') && this.context === 'home';
     
     // Track touch/mouse position for visual
     let lastX = 0, lastY = 0;
@@ -473,6 +474,7 @@ export class DragAndDropManager {
     const sortable = new Sortable(gridContainer, {
       ...this.getBaseSortableOptions(false),
       draggable: '.entity-card-wrapper',
+      group: isHomeAreaGrid ? { name: 'apple-home-dashboard-area-tiles', pull: true, put: true } : undefined,
       
       onStart: (evt) => {
         DragAndDropManager.isReordering = true;
@@ -502,7 +504,7 @@ export class DragAndDropManager {
         document.body.style.userSelect = 'none';
       },
       
-      onEnd: (evt) => {
+      onEnd: async (evt) => {
         DragAndDropManager.isReordering = false;
         evt.item.classList.remove('dragging');
         
@@ -523,8 +525,29 @@ export class DragAndDropManager {
         
         this.reconnectSingleCameraManager(evt.item);
         
-        if (areaId) {
-          this.saveOrderCallback(areaId);
+        const fromAreaId = (evt.from as HTMLElement).dataset.areaId || areaId;
+        const toAreaId = (evt.to as HTMLElement).dataset.areaId || areaId;
+
+        if (fromAreaId && toAreaId && toAreaId !== fromAreaId) {
+          const entityId = (evt.item as HTMLElement).dataset.entityId;
+          const orderFor = (grid: HTMLElement): string[] => Array.from(grid.querySelectorAll('.entity-card-wrapper:not(.drag-placeholder)'))
+            .map(wrapper => (wrapper as HTMLElement).dataset.entityId)
+            .filter((id): id is string => Boolean(id));
+
+          if (entityId && this.context === 'home' && this.customizationManager?.saveEntityAreaMove) {
+            await this.customizationManager.saveEntityAreaMove(
+              entityId,
+              fromAreaId,
+              toAreaId,
+              orderFor(evt.from as HTMLElement),
+              orderFor(evt.to as HTMLElement)
+            );
+          } else {
+            this.saveOrderCallback(fromAreaId);
+            this.saveOrderCallback(toAreaId);
+          }
+        } else if (fromAreaId) {
+          this.saveOrderCallback(fromAreaId);
         }
       }
     });

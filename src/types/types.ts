@@ -26,6 +26,7 @@ export interface CardConfig {
   name?: string;
   domain?: string;
   is_tall?: boolean;
+  design_type?: CardDesignType;
   area_id?: string;
   cards?: CardConfig[];
   section_type?: 'scenes' | 'cameras' | 'areas';
@@ -82,6 +83,7 @@ export interface EntityState {
 export enum CardDesignType {
   REGULAR = 'regular',
   TALL = 'tall',
+  SENSOR = 'sensor',
   // Future design types can be added here
   // COMPACT = 'compact',
   // WIDE = 'wide',

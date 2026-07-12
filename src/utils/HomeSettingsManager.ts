@@ -81,7 +81,7 @@ export class HomeSettingsManager {
       excludedFromDashboard: customizations.home?.excluded_from_dashboard || [],
       excludedFromHome: customizations.home?.excluded_from_home || [],
       includedSwitches: customizations.home?.included_switches || [],
-      extraAccessories: customizations.home?.extra_accessories || [],
+      extraAccessories: customizations.home?.promoted_entities || customizations.home?.extra_accessories || [],
       weatherEntity: customizations.home?.weather_entity || undefined,
       backgroundType: currentBackground.type,
       customBackground: currentBackground.type === 'custom' ? currentBackground.backgroundImage : undefined,
@@ -1354,7 +1354,25 @@ export class HomeSettingsManager {
     home.excluded_from_dashboard = this.settings.excludedFromDashboard;
     home.excluded_from_home = this.settings.excludedFromHome;
     home.included_switches = this.settings.includedSwitches;
-    home.extra_accessories = this.settings.extraAccessories;
+    const oldPromoted = new Set<string>(home.promoted_entities || home.extra_accessories || []);
+    const nextPromoted = new Set<string>(this.settings.extraAccessories);
+    const newlyPromotedSensorCards = this.settings.extraAccessories.filter(entityId => !oldPromoted.has(entityId));
+    const removedPromoted = [...oldPromoted].filter(entityId => !nextPromoted.has(entityId));
+
+    home.promoted_entities = this.settings.extraAccessories;
+    delete home.extra_accessories;
+    home.sensor_cards = Array.from(new Set([...(home.sensor_cards || []), ...newlyPromotedSensorCards]))
+      .filter((entityId: string) => !removedPromoted.includes(entityId));
+
+    if (home.entity_area_overrides) {
+      removedPromoted.forEach(entityId => delete home.entity_area_overrides[entityId]);
+    }
+    if (home.entities_order) {
+      Object.keys(home.entities_order).forEach(areaId => {
+        home.entities_order[areaId] = (home.entities_order[areaId] || [])
+          .filter((entityId: string) => !removedPromoted.includes(entityId));
+      });
+    }
     home.weather_entity = this.settings.weatherEntity;
     home.show_switches = this.settings.showSwitches;
     home.show_energy = this.settings.showEnergy;
