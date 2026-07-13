@@ -5,6 +5,8 @@
   "main": "apple-home-dashboard.js",
   "scripts": {
     "build": "webpack",
+    "build:lab": "node scripts/build-lab.mjs",
+    "test": "node --test tests/*.test.mjs",
     "build:dev": "webpack --mode=development --watch",
     "deploy": "./deploy.sh",
     "lint": "eslint \"src/**/*.{ts,js}\"",
