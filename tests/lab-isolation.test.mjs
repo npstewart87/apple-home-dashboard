@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { transformBundle } from '../scripts/build-lab.mjs';
+
+const dragSource = readFileSync(new URL('../src/utils/DragAndDropManager.ts', import.meta.url), 'utf8');
+const customizationSource = readFileSync(new URL('../src/utils/CustomizationManager.ts', import.meta.url), 'utf8');
 
 const originalRegistrations = `
 customElements.define("apple-home-card",Card)
@@ -29,4 +33,25 @@ test('lab build uses a separate customization event namespace', () => {
   const result = transformBundle('apple-home-customizations-updated apple-home-dashboard-active');
 
   assert.equal(result, 'apple-home-lab-customizations-updated apple-home-lab-dashboard-active');
+});
+
+test('grid drag visual does not deep-clone computed styles', () => {
+  const createVisual = dragSource.slice(
+    dragSource.indexOf('private createDragVisual'),
+    dragSource.indexOf('private createCameraDragVisual')
+  );
+
+  assert.doesNotMatch(createVisual, /cloneWithStyles\(/);
+  assert.match(createVisual, /textContent/);
+});
+
+test('cross-area drop stages state without saving Lovelace during onEnd', () => {
+  const gridSortable = dragSource.slice(
+    dragSource.indexOf('private setupGridSortable'),
+    dragSource.indexOf('private setupCarouselSortable')
+  );
+
+  assert.match(gridSortable, /stageEntityAreaMove\(/);
+  assert.doesNotMatch(gridSortable, /await this\.customizationManager\.saveEntityAreaMove/);
+  assert.match(customizationSource, /stageEntityAreaMove\([\s\S]*?\): void/);
 });

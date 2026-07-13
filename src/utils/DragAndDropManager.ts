@@ -101,70 +101,32 @@ export class DragAndDropManager {
    */
   private createDragVisual(element: HTMLElement, x: number, y: number, isChip: boolean = false): void {
     this.removeDragVisual();
-    
+
     const rect = element.getBoundingClientRect();
-    
+    const entityId = element.dataset.entityId || '';
+    const card = element.querySelector('apple-home-card');
+    const entityName = card?.shadowRoot?.querySelector('.entity-name')?.textContent?.trim();
+    const chipName = element.querySelector('.chip')?.textContent?.trim();
+
     this.dragVisual = document.createElement('div');
     this.dragVisual.className = 'drag-visual-clone' + (isChip ? ' chip' : '');
-    this.dragVisual.style.width = rect.width + 'px';
-    this.dragVisual.style.height = rect.height + 'px';
-    this.dragVisual.style.left = (x - rect.width / 2) + 'px';
-    this.dragVisual.style.top = (y - rect.height / 2) + 'px';
-    
-    const card = element.querySelector('apple-home-card');
-    if (card && card.shadowRoot) {
-      const innerCard = card.shadowRoot.querySelector('.apple-home-card') as HTMLElement;
-      if (innerCard) {
-        // Just copy the card's styles directly
-        const cardStyle = window.getComputedStyle(innerCard);
-        this.dragVisual.style.background = cardStyle.background;
-        this.dragVisual.style.backdropFilter = cardStyle.backdropFilter;
-        (this.dragVisual.style as any).webkitBackdropFilter = (cardStyle as any).webkitBackdropFilter;
-        this.dragVisual.style.borderRadius = cardStyle.borderRadius;
-        
-        // Check if this is a camera card - look for camera-specific elements
-        const cameraContainer = innerCard.querySelector('.camera-container') as HTMLElement;
-        const cameraIconUnavailable = innerCard.querySelector('.camera-icon-unavailable') as HTMLElement;
-        const cameraIconNoSnapshot = innerCard.querySelector('.camera-icon-no-snapshot') as HTMLElement;
-        
-        if (cameraContainer || cameraIconUnavailable || cameraIconNoSnapshot) {
-          // This is a camera card - handle specially
-          this.createCameraDragVisual(innerCard, cameraContainer, cameraIconUnavailable, cameraIconNoSnapshot);
-        } else {
-          // Clone the entire inner card structure with inline styles
-          const clone = this.cloneWithStyles(innerCard);
-          clone.style.width = '100%';
-          clone.style.height = '100%';
-          this.dragVisual.appendChild(clone);
-        }
-      }
-    } else if (isChip) {
-      // For chips, the actual chip element is inside the wrapper
-      const chipElement = element.querySelector('.chip') as HTMLElement;
-      if (chipElement) {
-        const chipStyle = window.getComputedStyle(chipElement);
-        this.dragVisual.style.background = chipStyle.background || chipStyle.backgroundColor;
-        this.dragVisual.style.backdropFilter = chipStyle.backdropFilter || 'blur(20px)';
-        (this.dragVisual.style as any).webkitBackdropFilter = (chipStyle as any).webkitBackdropFilter || 'blur(20px)';
-        this.dragVisual.style.borderRadius = chipStyle.borderRadius || '20px';
-        
-        // Clone the chip content
-        const clone = this.cloneWithStyles(chipElement);
-        clone.style.width = '100%';
-        clone.style.height = '100%';
-        clone.style.margin = '0';
-        this.dragVisual.appendChild(clone);
-      } else {
-        // Fallback - just clone the wrapper
-        const clone = this.cloneWithStyles(element);
-        clone.style.width = '100%';
-        clone.style.height = '100%';
-        this.dragVisual.appendChild(clone);
-      }
-    } else {
-      this.dragVisual.style.background = 'rgba(128, 128, 128, 0.5)';
-    }
-    
+    this.dragVisual.textContent = entityName || chipName || entityId || 'Moving tile';
+    this.dragVisual.style.cssText += `
+      width: ${rect.width}px;
+      height: ${rect.height}px;
+      left: ${x - rect.width / 2}px;
+      top: ${y - rect.height / 2}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      box-sizing: border-box;
+      background: rgba(50, 50, 55, 0.96);
+      color: white;
+      font: 600 14px -apple-system, BlinkMacSystemFont, sans-serif;
+      text-align: center;
+    `;
+
     document.body.appendChild(this.dragVisual);
   }
 
@@ -504,7 +466,7 @@ export class DragAndDropManager {
         document.body.style.userSelect = 'none';
       },
       
-      onEnd: async (evt) => {
+      onEnd: (evt) => {
         DragAndDropManager.isReordering = false;
         evt.item.classList.remove('dragging');
         
@@ -528,14 +490,15 @@ export class DragAndDropManager {
         const fromAreaId = (evt.from as HTMLElement).dataset.areaId || areaId;
         const toAreaId = (evt.to as HTMLElement).dataset.areaId || areaId;
 
+        const orderFor = (grid: HTMLElement): string[] => Array.from(grid.querySelectorAll('.entity-card-wrapper:not(.drag-placeholder)'))
+          .map(wrapper => (wrapper as HTMLElement).dataset.entityId)
+          .filter((id): id is string => Boolean(id));
+
         if (fromAreaId && toAreaId && toAreaId !== fromAreaId) {
           const entityId = (evt.item as HTMLElement).dataset.entityId;
-          const orderFor = (grid: HTMLElement): string[] => Array.from(grid.querySelectorAll('.entity-card-wrapper:not(.drag-placeholder)'))
-            .map(wrapper => (wrapper as HTMLElement).dataset.entityId)
-            .filter((id): id is string => Boolean(id));
 
-          if (entityId && this.context === 'home' && this.customizationManager?.saveEntityAreaMove) {
-            await this.customizationManager.saveEntityAreaMove(
+          if (entityId && this.context === 'home' && this.customizationManager?.stageEntityAreaMove) {
+            this.customizationManager.stageEntityAreaMove(
               entityId,
               fromAreaId,
               toAreaId,
@@ -547,7 +510,11 @@ export class DragAndDropManager {
             this.saveOrderCallback(toAreaId);
           }
         } else if (fromAreaId) {
-          this.saveOrderCallback(fromAreaId);
+          if (this.context === 'home' && this.customizationManager?.stageEntityOrder) {
+            this.customizationManager.stageEntityOrder(fromAreaId, orderFor(evt.from as HTMLElement));
+          } else {
+            this.saveOrderCallback(fromAreaId);
+          }
         }
       }
     });

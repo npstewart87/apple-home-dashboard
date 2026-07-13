@@ -696,13 +696,20 @@ export class CustomizationManager {
     return entityOrder.filter(entityId => this.isValidEntityId(entityId));
   }
 
-  async saveEntityAreaMove(
+  stageEntityOrder(areaId: string, entityOrder: string[]): void {
+    const homeData = this.getCustomization('home');
+    homeData.entities_order = homeData.entities_order || {};
+    homeData.entities_order[areaId] = this.validEntityOrder(entityOrder);
+    this.setCustomizationLocal('home', homeData);
+  }
+
+  stageEntityAreaMove(
     entityId: string,
     fromAreaId: string,
     toAreaId: string,
     fromOrder: string[],
     toOrder: string[]
-  ): Promise<void> {
+  ): void {
     if (!this.isValidEntityId(entityId)) return;
     const homeData = this.getCustomization('home');
     homeData.entity_area_overrides = homeData.entity_area_overrides || {};
@@ -710,7 +717,18 @@ export class CustomizationManager {
     homeData.entity_area_overrides[entityId] = toAreaId;
     homeData.entities_order[fromAreaId] = this.validEntityOrder(fromOrder);
     homeData.entities_order[toAreaId] = this.validEntityOrder(toOrder);
-    await this.setCustomization('home', homeData);
+    this.setCustomizationLocal('home', homeData);
+  }
+
+  async saveEntityAreaMove(
+    entityId: string,
+    fromAreaId: string,
+    toAreaId: string,
+    fromOrder: string[],
+    toOrder: string[]
+  ): Promise<void> {
+    this.stageEntityAreaMove(entityId, fromAreaId, toAreaId, fromOrder, toOrder);
+    await this.saveCustomizations();
   }
 
   async getWeatherEntity(): Promise<string | undefined> {
