@@ -83,21 +83,21 @@ export class HomePage {
 
     try {
       // Fetch all data in parallel
-      const [areas, entities, devices, showSwitches, includedSwitches, promotedEntities] = await Promise.all([
+      const [areas, entities, devices, showSwitches, includedSwitches, extraAccessories] = await Promise.all([
         DataService.getAreas(hass),
         DataService.getEntities(hass),
         DataService.getDevices(hass),
         this.customizationManager?.getShowSwitches().then(v => v || false) ?? Promise.resolve(false),
         this.customizationManager?.getIncludedSwitches().then(v => v || []) ?? Promise.resolve([] as string[]),
-        this.customizationManager?.getPromotedEntities().then(v => v || []) ?? Promise.resolve([] as string[])
+        this.customizationManager?.getExtraAccessories().then(v => v || []) ?? Promise.resolve([] as string[])
       ]);
       
       // Filter entities for supported domains and exclude those marked for exclusion
       const supportedEntities = entities.filter(entity => {
         const domain = entity.entity_id.split('.')[0];
 
-        // Check if this entity is in the promoted entities list (manually added entities)
-        if (promotedEntities.includes(entity.entity_id)) {
+        // Check if this entity is in the extraAccessories list (manually added entities)
+        if (extraAccessories.includes(entity.entity_id)) {
           return true;
         }
 
@@ -153,14 +153,13 @@ export class HomePage {
         }
       }
       
+      // Group regular entities by area
+      const entitiesByArea = DataService.groupEntitiesByArea(regularEntities, areas, devices);
+      
       // Apply user customizations
       if (!this.customizationManager) {
         throw new Error('CustomizationManager not initialized');
       }
-
-      // Group regular entities by area
-      const areaOverrides = this.customizationManager.getEntityAreaOverrides();
-      const entitiesByArea = DataService.groupEntitiesByArea(regularEntities, areas, devices, areaOverrides);
       
       const customizations = this.customizationManager.getCustomizations();
       const customizedAreas = this.applyCustomizations(entitiesByArea, customizations);

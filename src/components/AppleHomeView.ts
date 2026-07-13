@@ -2400,8 +2400,8 @@ export class AppleHomeView extends HTMLElement {
       }
 
       // --- Switches toggle ---
-      const switchesChanged = oldHome.show_switches !== newHome.show_switches;
-      const includedSwitchesChanged = JSON.stringify(oldHome.included_switches || []) !== JSON.stringify(newHome.included_switches || []);
+      const switchesChanged = oldHome.showSwitches !== newHome.showSwitches;
+      const includedSwitchesChanged = JSON.stringify(oldHome.includedSwitches || []) !== JSON.stringify(newHome.includedSwitches || []);
       if (switchesChanged || includedSwitchesChanged) {
         // Switches visibility changed - need rebuild since it affects many cards
         this._rendered = false;
@@ -2410,20 +2410,12 @@ export class AppleHomeView extends HTMLElement {
       }
 
       // --- Extra accessories ---
-      const oldExtra = new Set<string>(oldHome.promoted_entities || oldHome.extra_accessories || []);
-      const newExtra = new Set<string>(newHome.promoted_entities || newHome.extra_accessories || []);
+      const oldExtra = new Set<string>(oldHome.extraAccessories || []);
+      const newExtra = new Set<string>(newHome.extraAccessories || []);
       const extraRemoved = [...oldExtra].filter(e => !newExtra.has(e));
       const extraAdded = [...newExtra].filter(e => !oldExtra.has(e));
       for (const entityId of extraRemoved) { this.fadeOutCard(entityId); didChange = true; }
       for (const entityId of extraAdded) { this.addCardToDOM(entityId); didChange = true; }
-
-      // --- Sensor display mode ---
-      const sensorCardsChanged = JSON.stringify(oldHome.sensor_cards || []) !== JSON.stringify(newHome.sensor_cards || []);
-      if (sensorCardsChanged) {
-        this._rendered = false;
-        await this.renderPage('refreshCallback');
-        return;
-      }
 
       // --- Section order ---
       const sectionOrderChanged = JSON.stringify(oldHome.sections?.order) !== JSON.stringify(newHome.sections?.order);
