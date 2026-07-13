@@ -1,6 +1,6 @@
 import { DashboardConfig } from '../config/DashboardConfig';
 import { SnapshotManager } from '../utils/SnapshotManager';
-import { CardConfig, CardDesignType, EntityData, EntityState } from '../types/types';
+import { CardConfig, EntityState } from '../types/types';
 import { localize } from '../utils/LocalizationService';
 import { RTLHelper } from '../utils/RTLHelper';
 
@@ -11,7 +11,6 @@ export class AppleHomeCard extends HTMLElement {
   private name?: string;
   private domain?: string;
   private isTall?: boolean;
-  private designType: CardDesignType = CardDesignType.REGULAR;
   private defaultIcon?: string;
   private cameraView?: string;
   private refreshInterval?: number;
@@ -122,7 +121,6 @@ export class AppleHomeCard extends HTMLElement {
     this.name = config.name;
     this.domain = config.domain || config.entity.split('.')[0];
     this.isTall = config.is_tall || false;
-    this.designType = config.design_type || (this.isTall ? CardDesignType.TALL : CardDesignType.REGULAR);
     this.defaultIcon = (config as any).default_icon;
     this.cameraView = (config as any).camera_view;
     this.refreshInterval = (config as any).refresh_interval || 10000;
@@ -133,7 +131,7 @@ export class AppleHomeCard extends HTMLElement {
     }
 
     // Set design class based on configuration
-    this.className = this.designType === CardDesignType.SENSOR ? 'sensor-design' : (this.isTall ? 'tall-design' : 'regular-design');
+    this.className = this.isTall ? 'tall-design' : 'regular-design';
   }
 
   set hass(hass: any) {
@@ -191,11 +189,7 @@ export class AppleHomeCard extends HTMLElement {
     const isInStatusContext = this.closest('.status-modal-cards') || this.closest('.status-chips-container');
     const forceWhiteIcons = Boolean(isInStatusContext);
     
-    let entityData = DashboardConfig.getEntityData(state, this.domain!, this.isTall, forceWhiteIcons, this._hass);
-    const isSensorDesign = this.designType === CardDesignType.SENSOR;
-    if (isSensorDesign) {
-      entityData = this.asSensorReadout(entityData, state);
-    }
+    const entityData = DashboardConfig.getEntityData(state, this.domain!, this.isTall, forceWhiteIcons, this._hass);
     
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
@@ -284,7 +278,7 @@ export class AppleHomeCard extends HTMLElement {
       <style>
         ${this.getCardStyles(entityData, isEditMode)}
       </style>
-      <div class="apple-home-card ${isEditMode ? 'edit-mode' : ''} ${isSensorDesign ? 'sensor-card' : ''} ${this.domain === 'camera' && this.cameraView === 'snapshot' ? 'camera-card' : ''} ${RTLHelper.isRTL() ? 'rtl' : 'ltr'}">
+      <div class="apple-home-card ${isEditMode ? 'edit-mode' : ''} ${this.domain === 'camera' && this.cameraView === 'snapshot' ? 'camera-card' : ''} ${RTLHelper.isRTL() ? 'rtl' : 'ltr'}">
         <div class="card-info">
           ${iconElement}
           ${this.domain === 'camera' && this.cameraView === 'snapshot' ? (() => {
@@ -370,21 +364,6 @@ export class AppleHomeCard extends HTMLElement {
     }
   }
 
-  private asSensorReadout(entityData: EntityData, state: EntityState): EntityData {
-    const unit = state.attributes?.unit_of_measurement;
-    const unavailable = ['unavailable', 'unknown', 'none', 'null', ''].includes(String(state.state).toLowerCase());
-    const stateText = unit && !unavailable ? `${state.state} ${unit}` : entityData.stateText;
-
-    return {
-      ...entityData,
-      isActive: false,
-      backgroundColor: 'var(--apple-card-bg-inactive, rgba(56, 56, 56, 0.46))',
-      iconBackgroundColor: 'var(--apple-icon-bg-inactive, rgba(0, 0, 0, 0.2))',
-      textColor: 'var(--apple-text-inactive, #ffffff)',
-      stateText,
-    };
-  }
-
   private updateCSSVariables(entityData: any) {
     this.style.setProperty('--card-bg-color', entityData.backgroundColor);
     this.style.setProperty('--card-icon-color', entityData.iconColor);
@@ -403,10 +382,7 @@ export class AppleHomeCard extends HTMLElement {
     const name = this.name || state.attributes.friendly_name || this.entity.split('.')[1].replace(/_/g, ' ');
     const isInStatusContext = this.closest('.status-modal-cards') || this.closest('.status-chips-container');
     const forceWhiteIcons = Boolean(isInStatusContext);
-    let entityData = DashboardConfig.getEntityData(state, this.domain!, this.isTall, forceWhiteIcons, this._hass);
-    if (this.designType === CardDesignType.SENSOR) {
-      entityData = this.asSensorReadout(entityData, state);
-    }
+    const entityData = DashboardConfig.getEntityData(state, this.domain!, this.isTall, forceWhiteIcons, this._hass);
 
     // Update CSS custom properties - browser handles all visual changes efficiently
     this.updateCSSVariables(entityData);
@@ -1063,14 +1039,6 @@ export class AppleHomeCard extends HTMLElement {
         padding: calc(var(--apple-card-padding, 10px) * 1.1);
       }
 
-      :host(.sensor-design) .apple-home-card {
-        cursor: pointer;
-      }
-
-      :host(.sensor-design) .entity-state {
-        font-variant-numeric: tabular-nums;
-      }
-
       /* Mobile adjustments for card layout */
       @media (max-width: 768px) { 
         :host(.regular-design) .card-info {
@@ -1111,15 +1079,6 @@ export class AppleHomeCard extends HTMLElement {
 
   private handleIconClick(event: Event) {
     if (!this._hass || !this.entity) return;
-    if (this.designType === CardDesignType.SENSOR) {
-      event.stopPropagation();
-      this.dispatchEvent(new CustomEvent('hass-more-info', {
-        bubbles: true,
-        composed: true,
-        detail: { entityId: this.entity }
-      }));
-      return;
-    }
     
     // Prevent the card click from firing
     event.stopPropagation();

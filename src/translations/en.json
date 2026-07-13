@@ -155,9 +155,7 @@
     "edit_cameras_view": "Edit Cameras View",
     "edit_room_view": "Edit Room View",
     "make_tall": "Make Tall",
-    "make_normal_size": "Make Normal Size",
-    "show_as_sensor": "Show as Sensor",
-    "show_as_control": "Show as Control"
+    "make_normal_size": "Make Normal Size"
   },
   "toggles": {
     "hide_header": "Hide Header",

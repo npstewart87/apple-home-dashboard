@@ -1,7 +1,7 @@
 import { CustomizationManager } from '../utils/CustomizationManager';
 import { CardManager } from '../utils/CardManager';
 import { DataService } from '../utils/DataService';
-import { CardDesignType, Entity, CardConfig, Area } from '../types/types';
+import { Entity, CardConfig, Area } from '../types/types';
 import { DashboardConfig } from '../config/DashboardConfig';
 import { localize } from '../utils/LocalizationService';
 import { RTLHelper } from '../utils/RTLHelper';
@@ -89,7 +89,7 @@ export class AreaSection {
     
     // Create entity cards for this area
     for (const entity of orderedCards) {
-      const cardConfig = this.createEntityCard(entity.entity_id, hass, areaName, entity, context);
+      const cardConfig = this.createEntityCard(entity.entity_id, hass, areaName, entity);
       if (cardConfig) {
         await this.createAndAppendCard(cardConfig, gridDiv, hass, onTallToggle, context);
       }
@@ -98,7 +98,7 @@ export class AreaSection {
     container.appendChild(gridDiv);
   }
 
-  private createEntityCard(entityId: string, hass: any, areaName?: string, entity?: Entity, context: string = 'home'): CardConfig | null {
+  private createEntityCard(entityId: string, hass: any, areaName?: string, entity?: Entity): CardConfig | null {
     const state = hass.states[entityId];
     if (!state) {
       return null;
@@ -135,15 +135,12 @@ export class AreaSection {
       isTallCard = (entity as any).is_tall;
     }
     
-    const isSensorCard = this.cardManager.shouldCardBeSensor(entityId, entity?.area_id || 'unknown', context);
-
     const card: CardConfig = {
       type: cardType,
       entity: entityId,
       name: friendlyName,
       domain: domain,
-      is_tall: isSensorCard ? false : isTallCard,
-      design_type: isSensorCard ? CardDesignType.SENSOR : undefined
+      is_tall: isTallCard
     };
     
     // Add default icon for scenes/scripts without icons
@@ -168,9 +165,8 @@ export class AreaSection {
         cardElement = document.createElement('apple-home-card') as HTMLElement;
         
         // Determine if card should be tall based on customizations
-        const shouldBeSensor = this.cardManager.shouldCardBeSensor(cardConfig.entity, container.dataset.areaId || 'unknown', context);
-        const shouldBeTall = !shouldBeSensor && this.cardManager.shouldCardBeTall(cardConfig.entity, container.dataset.areaId || 'unknown', context);
-        const configWithTall = { ...cardConfig, is_tall: shouldBeTall, design_type: shouldBeSensor ? CardDesignType.SENSOR : undefined };
+        const shouldBeTall = this.cardManager.shouldCardBeTall(cardConfig.entity, container.dataset.areaId || 'unknown', context);
+        const configWithTall = { ...cardConfig, is_tall: shouldBeTall };
         
         // Add default icon if specified
         if ((cardConfig as any).default_icon) {
@@ -199,13 +195,11 @@ export class AreaSection {
       wrapper.dataset.entityId = cardConfig.entity;
       
       // Determine if card should be tall based on customizations
-      const shouldBeSensor = this.cardManager.shouldCardBeSensor(cardConfig.entity, container.dataset.areaId || 'unknown', context);
-      const shouldBeTall = !shouldBeSensor && this.cardManager.shouldCardBeTall(cardConfig.entity, container.dataset.areaId || 'unknown', context);
+      const shouldBeTall = this.cardManager.shouldCardBeTall(cardConfig.entity, container.dataset.areaId || 'unknown', context);
       
       if (shouldBeTall) {
         wrapper.classList.add('tall');
       }
-      wrapper.classList.toggle('sensor', shouldBeSensor);
       
       // Always add edit mode controls
       const controlsDiv = document.createElement('div');
@@ -217,17 +211,11 @@ export class AreaSection {
       const entityDomain = cardConfig.entity ? cardConfig.entity.split('.')[0] : '';
       const isFixedSizeEntity = ['camera', 'scene', 'script'].includes(entityDomain);
       
-      // Only show display toggles for regular entities (not cameras or scenes)
+      // Only show tall toggle for regular entities (not cameras or scenes)
       if (!isFixedSizeEntity) {
         controlsHTML = `
-          <button class="entity-control-btn sensor-toggle ${shouldBeSensor ? 'active' : ''}"
-                  data-action="toggle-sensor"
-                  title="${shouldBeSensor ? localize('edit.show_as_control') : localize('edit.show_as_sensor')}">
-            <ha-icon icon="mdi:${shouldBeSensor ? 'eye' : 'eye-outline'}"></ha-icon>
-          </button>
           <button class="entity-control-btn tall-toggle ${shouldBeTall ? 'active' : ''}" 
                   data-action="toggle-tall" 
-                  style="${shouldBeSensor ? 'display: none;' : ''}"
                   title="Toggle card design">
             <ha-icon icon="mdi:${shouldBeTall ? 'arrow-collapse' : 'arrow-expand'}"></ha-icon>
           </button>
@@ -237,26 +225,6 @@ export class AreaSection {
       controlsDiv.innerHTML = controlsHTML;
       
       // Add event listeners for controls
-      const sensorToggle = controlsDiv.querySelector('.sensor-toggle') as HTMLButtonElement;
-      if (sensorToggle) {
-        sensorToggle.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const next = await this.cardManager.toggleSensorCard(cardConfig.entity);
-          const nextTall = next ? false : this.cardManager.shouldCardBeTall(cardConfig.entity, container.dataset.areaId || 'unknown', context);
-          wrapper.classList.toggle('sensor', next);
-          wrapper.classList.toggle('tall', nextTall);
-          sensorToggle.classList.toggle('active', next);
-          sensorToggle.title = next ? localize('edit.show_as_control') : localize('edit.show_as_sensor');
-          sensorToggle.innerHTML = `<ha-icon icon="mdi:${next ? 'eye' : 'eye-outline'}"></ha-icon>`;
-          const tallToggle = controlsDiv.querySelector('.tall-toggle') as HTMLButtonElement;
-          if (tallToggle) tallToggle.style.display = next ? 'none' : '';
-          const card = wrapper.querySelector('apple-home-card') as HTMLElement & { setConfig?: (config: CardConfig) => void };
-          if (card?.setConfig) {
-            card.setConfig({ ...cardConfig, is_tall: nextTall, design_type: next ? CardDesignType.SENSOR : undefined });
-          }
-        });
-      }
-
       const tallToggle = controlsDiv.querySelector('.tall-toggle') as HTMLButtonElement;
       if (tallToggle && onTallToggle) {
         tallToggle.addEventListener('click', (e) => {

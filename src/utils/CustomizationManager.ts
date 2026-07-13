@@ -4,7 +4,7 @@ import { DashboardStateManager } from './DashboardStateManager';
 
 export class CustomizationManager {
   private static instance: CustomizationManager | null = null;
-  private customizations: any = this.withDefaults({});
+  private customizations: any = { home: {}, pages: {}, ui: {}, background: {} };
   private _hass?: any;
   private isLoaded = false;
   // Track the dashboard key this manager is associated with
@@ -59,39 +59,26 @@ export class CustomizationManager {
     this.isLoaded = true;
   }
 
-  private withDefaults(customizations: any): any {
-    const home = customizations?.home || {};
-    return {
-      home: {
-        ...home,
-        excluded_from_dashboard: home.excluded_from_dashboard || [],
-        excluded_from_home: home.excluded_from_home || [],
-        sections: { order: [], hidden: [], ...(home.sections || {}) },
-        favorites: home.favorites || [],
-        chips_order: home.chips_order || [],
-        tall_cards: home.tall_cards || [],
-        sensor_cards: home.sensor_cards || [],
-        promoted_entities: home.promoted_entities || home.extra_accessories || [],
-        entity_area_overrides: home.entity_area_overrides || {},
-        entities_order: home.entities_order || {},
-      },
-      pages: customizations?.pages || {},
-      ui: customizations?.ui || {},
-      background: customizations?.background || {},
-      entities: customizations?.entities || {},
-    };
-  }
-
   // Migrate old structure to new structure
   private migrateToNewStructure(oldCustomizations: any): any {
     // Handle null/undefined customizations
     if (!oldCustomizations || typeof oldCustomizations !== 'object') {
-      return this.withDefaults({});
+      return {
+        home: {},
+        pages: {},
+        ui: {},
+        background: {}
+      };
     }
 
     // If it's already in the new structure, return as-is
     if (oldCustomizations.home || oldCustomizations.pages) {
-      return this.withDefaults(oldCustomizations);
+      return {
+        home: oldCustomizations.home || {},
+        pages: oldCustomizations.pages || {},
+        ui: oldCustomizations.ui || {},
+        background: oldCustomizations.background || {}
+      };
     }
 
     // Migrate old structure
@@ -106,9 +93,6 @@ export class CustomizationManager {
         favorites: oldCustomizations.areas?.favoriteAccessories || oldCustomizations.areas?.favorites || [],
         chips_order: oldCustomizations.areas?.chipsOrder || oldCustomizations.areas?.chips_order || [],
         tall_cards: oldCustomizations.entities?.tallCards || oldCustomizations.entities?.tall_cards || [],
-        sensor_cards: oldCustomizations.entities?.sensorCards || oldCustomizations.entities?.sensor_cards || [],
-        promoted_entities: oldCustomizations.areas?.extraAccessories || oldCustomizations.areas?.extra_accessories || [],
-        entity_area_overrides: oldCustomizations.entities?.areaOverrides || oldCustomizations.entities?.entity_area_overrides || {},
         entities_order: {} as any
       },
       pages: {} as any,
@@ -165,7 +149,7 @@ export class CustomizationManager {
       });
     }
 
-    return this.withDefaults(newStructure);
+    return newStructure;
   }
 
   async ensureCustomizationsLoaded(): Promise<void> {
@@ -336,7 +320,7 @@ export class CustomizationManager {
   async loadCustomizations(): Promise<any> {
     if (!this._hass) {
       console.error('🏠 APPLE HOME: No Home Assistant instance available for loading');
-      return this.withDefaults({});
+      return { home: {}, pages: {}, ui: {}, background: {} };
     }
     
     try {
@@ -350,14 +334,14 @@ export class CustomizationManager {
       });
       
       if (lovelaceResult && lovelaceResult.customizations) {
-        return this.withDefaults(lovelaceResult.customizations);
+        return lovelaceResult.customizations;
       }
       
-      return this.withDefaults({});
+      return { home: {}, pages: {}, ui: {}, background: {} };
       
     } catch (error) {
       console.error('🏠 APPLE HOME: Error loading customizations:', error);
-      return this.withDefaults({});
+      return { home: {}, pages: {}, ui: {}, background: {} };
     }
   }
 
@@ -674,43 +658,7 @@ export class CustomizationManager {
   async getExtraAccessories(): Promise<string[]> {
     await this.ensureCustomizationsLoaded();
     const homeData = this.getCustomization('home');
-    return homeData.promoted_entities || homeData.extra_accessories || [];
-  }
-
-  async getPromotedEntities(): Promise<string[]> {
-    await this.ensureCustomizationsLoaded();
-    const homeData = this.getCustomization('home');
-    return homeData.promoted_entities || homeData.extra_accessories || [];
-  }
-
-  getEntityAreaOverrides(): Record<string, string> {
-    const homeData = this.getCustomization('home');
-    return homeData.entity_area_overrides || {};
-  }
-
-  private isValidEntityId(entityId: string): boolean {
-    return /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId);
-  }
-
-  private validEntityOrder(entityOrder: string[]): string[] {
-    return entityOrder.filter(entityId => this.isValidEntityId(entityId));
-  }
-
-  async saveEntityAreaMove(
-    entityId: string,
-    fromAreaId: string,
-    toAreaId: string,
-    fromOrder: string[],
-    toOrder: string[]
-  ): Promise<void> {
-    if (!this.isValidEntityId(entityId)) return;
-    const homeData = this.getCustomization('home');
-    homeData.entity_area_overrides = homeData.entity_area_overrides || {};
-    homeData.entities_order = homeData.entities_order || {};
-    homeData.entity_area_overrides[entityId] = toAreaId;
-    homeData.entities_order[fromAreaId] = this.validEntityOrder(fromOrder);
-    homeData.entities_order[toAreaId] = this.validEntityOrder(toOrder);
-    await this.setCustomization('home', homeData);
+    return homeData.extra_accessories || [];
   }
 
   async getWeatherEntity(): Promise<string | undefined> {

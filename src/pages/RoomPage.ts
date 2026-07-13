@@ -6,7 +6,7 @@ import { ScenesSection } from '../sections/ScenesSection';
 import { CamerasSection } from '../sections/CamerasSection';
 import { AreaSection } from '../sections/AreaSection';
 import { StatusSection } from '../sections/StatusSection';
-import { CardDesignType, Entity } from '../types/types';
+import { Entity } from '../types/types';
 import { localize } from '../utils/LocalizationService';
 
 export class RoomPage {
@@ -97,21 +97,21 @@ export class RoomPage {
 
     try {
       // Fetch all data in parallel
-      const [areas, entities, devices, showSwitches, includedSwitches, promotedEntities] = await Promise.all([
+      const [areas, entities, devices, showSwitches, includedSwitches, extraAccessories] = await Promise.all([
         DataService.getAreas(hass),
         DataService.getEntities(hass),
         DataService.getDevices(hass),
         this.customizationManager?.getShowSwitches().then(v => v || false) ?? Promise.resolve(false),
         this.customizationManager?.getIncludedSwitches().then(v => v || []) ?? Promise.resolve([] as string[]),
-        this.customizationManager?.getPromotedEntities().then(v => v || []) ?? Promise.resolve([] as string[])
+        this.customizationManager?.getExtraAccessories().then(v => v || []) ?? Promise.resolve([] as string[])
       ]);
       
       // Filter entities for supported domains and exclude those marked for exclusion
       const supportedEntities = entities.filter(entity => {
         const domain = entity.entity_id.split('.')[0];
 
-        // Check if this entity is in the promoted entities list (manually added entities)
-        if (promotedEntities.includes(entity.entity_id)) {
+        // Check if this entity is in the extraAccessories list (manually added entities)
+        if (extraAccessories.includes(entity.entity_id)) {
           return true;
         }
 
@@ -182,11 +182,10 @@ export class RoomPage {
       const filteredStatusEntities = statusEntities.filter(entity => !excludedFromDashboard.has(entity.entity_id));
       
       // Group regular entities by area (excluding sensors)
-      const areaOverrides = this.customizationManager?.getEntityAreaOverrides() || {};
-      const entitiesByArea = DataService.groupEntitiesByArea(filteredEntities, areas, devices, areaOverrides);
+      const entitiesByArea = DataService.groupEntitiesByArea(filteredEntities, areas, devices);
       
       // Group status entities by area (including sensors)
-      const statusEntitiesByArea = DataService.groupEntitiesByArea(filteredStatusEntities, areas, devices, areaOverrides);
+      const statusEntitiesByArea = DataService.groupEntitiesByArea(filteredStatusEntities, areas, devices);
       
       // Get entities for this specific area
       const areaEntities = entitiesByArea[areaId] || [];
@@ -418,7 +417,6 @@ export class RoomPage {
       name: entityCustomizations?.name || stateObj.attributes.friendly_name || entityId,
       area_id: entity.area_id,
       is_tall: this.cardManager?.shouldCardBeTall(entityId, this._areaId || 'unknown', this._areaId!) || false,
-      design_type: this.cardManager?.shouldCardBeSensor(entityId, this._areaId || 'unknown', this._areaId!) ? CardDesignType.SENSOR : undefined,
       ...entityCustomizations
     };
 
@@ -438,11 +436,9 @@ export class RoomPage {
     wrapper.dataset.areaId = this._areaId || 'unknown';
     
     // Apply tall class if needed
-    const isSensorCard = cardConfig.design_type === CardDesignType.SENSOR;
-    if (cardConfig.is_tall && !isSensorCard) {
+    if (cardConfig.is_tall) {
       wrapper.classList.add('tall');
     }
-    wrapper.classList.toggle('sensor', isSensorCard);
 
     // Create the card element
     const cardElement = document.createElement('apple-home-card') as any;
@@ -453,36 +449,12 @@ export class RoomPage {
     const controls = document.createElement('div');
     controls.className = 'entity-controls';
     
-    // Sensor/read-only toggle button
-    const sensorButton = document.createElement('button');
-    sensorButton.className = 'entity-control-btn sensor-toggle';
-    sensorButton.innerHTML = `<ha-icon icon="mdi:${isSensorCard ? 'eye' : 'eye-outline'}"></ha-icon>`;
-    sensorButton.title = isSensorCard ? localize('edit.show_as_control') : localize('edit.show_as_sensor');
-    sensorButton.classList.toggle('active', isSensorCard);
-    sensorButton.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!this.cardManager) return;
-      const next = await this.cardManager.toggleSensorCard(cardConfig.entity);
-      const nextTall = next ? false : this.cardManager.shouldCardBeTall(cardConfig.entity, this._areaId || 'unknown', this._areaId!);
-      wrapper.classList.toggle('sensor', next);
-      wrapper.classList.toggle('tall', nextTall);
-      sensorButton.classList.toggle('active', next);
-      sensorButton.innerHTML = `<ha-icon icon="mdi:${next ? 'eye' : 'eye-outline'}"></ha-icon>`;
-      sensorButton.title = next ? localize('edit.show_as_control') : localize('edit.show_as_sensor');
-      tallButton.style.display = next ? 'none' : '';
-      cardConfig.design_type = next ? CardDesignType.SENSOR : undefined;
-      cardConfig.is_tall = nextTall;
-      cardElement.setConfig(cardConfig);
-    });
-
     // Tall toggle button
     const tallButton = document.createElement('button');
     tallButton.className = 'entity-control-btn tall-toggle';
     tallButton.innerHTML = `<ha-icon icon="mdi:${cardConfig.is_tall ? 'arrow-collapse' : 'arrow-expand'}"></ha-icon>`;
     tallButton.title = cardConfig.is_tall ? localize('edit.make_normal_size') : localize('edit.make_tall');
     tallButton.classList.toggle('active', cardConfig.is_tall);
-    tallButton.style.display = isSensorCard ? 'none' : '';
     
     tallButton.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -500,7 +472,6 @@ export class RoomPage {
       }
     });
 
-    controls.appendChild(sensorButton);
     controls.appendChild(tallButton);
     wrapper.appendChild(controls);
     wrapper.appendChild(cardElement);

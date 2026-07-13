@@ -127,11 +127,10 @@ export class GroupPage {
 
     try {
       // Fetch all data in parallel
-      const [areas, entities, devices, promotedEntities] = await Promise.all([
+      const [areas, entities, devices] = await Promise.all([
         DataService.getAreas(hass),
         DataService.getEntities(hass),
-        DataService.getDevices(hass),
-        this.customizationManager?.getPromotedEntities().then(v => v || []) ?? Promise.resolve([] as string[])
+        DataService.getDevices(hass)
       ]);
       
       // Get hidden sections (areas) for filtering
@@ -144,7 +143,7 @@ export class GroupPage {
           return false;
         }
         const domain = entity.entity_id.split('.')[0];
-        return DashboardConfig.isSupportedDomain(domain) || promotedEntities.includes(entity.entity_id);
+        return DashboardConfig.isSupportedDomain(domain);
       });
 
       // Create a separate list for status section that includes sensor domains
@@ -181,8 +180,7 @@ export class GroupPage {
       );
       
       // Group regular entities by area
-      const areaOverrides = this.customizationManager?.getEntityAreaOverrides() || {};
-      const entitiesByArea = DataService.groupEntitiesByArea(regularEntities, areas, devices, areaOverrides);
+      const entitiesByArea = DataService.groupEntitiesByArea(regularEntities, areas, devices);
       
       // Get showSwitches and includedSwitches settings
       const showSwitches = await this.customizationManager?.getShowSwitches() || false;

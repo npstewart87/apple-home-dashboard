@@ -40,7 +40,7 @@ export class DataService {
     }
   }
 
-  static groupEntitiesByArea(entities: Entity[], areas: Area[], devices: Device[] = [], areaOverrides: Record<string, string> = {}): { [areaId: string]: Entity[] } {
+  static groupEntitiesByArea(entities: Entity[], areas: Area[], devices: Device[] = []): { [areaId: string]: Entity[] } {
     const entitiesByArea: { [areaId: string]: Entity[] } = {};
     
     // Initialize areas
@@ -53,7 +53,7 @@ export class DataService {
     
     // Group entities by area
     entities.forEach(entity => {
-      let areaId = areaOverrides[entity.entity_id] || entity.area_id;
+      let areaId = entity.area_id;
       
       // If entity doesn't have an area but has a device, check device's area
       if (!areaId && entity.device_id) {
